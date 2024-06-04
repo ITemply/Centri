@@ -19,6 +19,30 @@ const username = process.env.USERNAME
 const password = process.env.PASSWORD
 const port = process.env.PORT
 
+async function executeSQL(sql){
+  var connection = mysql.createConnection({
+      host: databaseUrl,
+      user: username,
+      password: password,
+      port: port
+  })
+
+  return new Promise((resolve, reject) =>{
+      try{
+          connection.query(sql, function (err, result) {
+              if (err){
+                  return reject(err)
+              }
+              connection.end()
+              return resolve(result)
+          })
+      }
+      catch(e){
+          reject(e)
+      }
+  })
+}
+
 app.get('/', async function(req, res){
 
 })
