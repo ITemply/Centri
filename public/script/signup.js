@@ -26,3 +26,9 @@ async function signupUser() {
         localStorage.setItem('token', token)
     }
 }
+
+function checkLoginStatus() {
+    if (localStorage.getItem('token') !== null) {
+        window.location.href = '/home'
+    }
+}
