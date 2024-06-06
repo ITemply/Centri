@@ -9,6 +9,10 @@ const mysql = require('mysql')
 const crypto = require('crypto');
 dotenv.config()
 
+// 3 = Owner
+// 2 = Admin
+// 1 = Moderator
+
 app.set('views', path.join(__dirname, 'public'))
 app.set('view engine', 'ejs')
 app.use(express.json())
@@ -72,11 +76,6 @@ function base64Image(file){
     return fs.readFileSync(file, 'base64')
 }
 
-function checkUserane(inputString) {
-    const characterList = new RegExp(`[^${validUsernameChars}]`, 'g')
-    return !characterList.test(inputString)
-}
-
 function encode(text, algkey) {
     const cipher = crypto.createCipher(algorithm, algkey)  
     const  encrypted = cipher.update(text, 'utf8', 'hex') + cipher.final('hex')
@@ -101,7 +100,9 @@ function checkCharacters(inputString) {
 
 async function checkCurrentUsername(checkUsername){
     const sqlCheck = await executeSQL('SELECT * FROM Centri.accounting WHERE checkUsername="' + checkUsername + '";')
-    if (sqlCheck[0]) {
+    if (sqlCheck[0] === null) {
+        return false
+    } else if (sqlCheck[0] === undefined) {
         return false
     } else {
         return true       
@@ -133,7 +134,7 @@ app.post('/newsignin', async function(req, res){
     let hashedPassword = hash(password)
     let hashedCheckUsername = hash(checkUsername)
 
-    if (checkCurrentUsername(hashedCheckUsername)) {
+    if (await checkCurrentUsername(hashedCheckUsername)) {
         let userdata = await executeSQL('SELECT * FROM Centri.accounting WHERE checkUsername = "' + hashedCheckUsername + '"')
         let databasePassword = userdata[0]['password']
         if (databasePassword == hashedPassword) {
@@ -161,31 +162,31 @@ app.post('/newsignup', async function(req, res){
     let token = hashedCheckUsername+ '.' + hashedPassword
     let encodedUsername = encode(username, key)
 
-    if (await checkCurrentUsername(hashedCheckUsername)) {
-        if (checkUsername.length == 0) {
-            res.send(JSON.stringify({information: 'A Username is Required'}))
-            return
-        }
-        if (checkUsername != null && checkUsername.length < 20) {
-            if (checkUsernameCharacters(checkUsername)) {
-                if (password.length > 0) {
+    if (checkUsername.length == 0) {
+        res.send(JSON.stringify({information: 'A Username is Required'}))
+        return
+    }
+    if (checkUsername != null && checkUsername.length < 20) {
+        if (checkUsernameCharacters(checkUsername)) {
+            if (password.length > 0) {
+                if (await checkCurrentUsername(hashedCheckUsername) == false) {
                     await executeSQL("INSERT INTO Centri.accounting (username, checkUsername, password, token, status) VALUES ('" + encodedUsername + "', '" + hashedCheckUsername + "', '" + hashedPassword + "', '" + token + "', 0);")
                     res.send(JSON.stringify({information: 'Signed Up', token: token}))
                     return
                 } else {
-                    res.send(JSON.stringify({information: 'A Password is Required'}))
+                    res.send(JSON.stringify({information: 'Username is Already Taken'}))
                     return
                 }
             } else {
-                res.send(JSON.stringify({information: 'Username has Invalid Letters'}))
+                res.send(JSON.stringify({information: 'A Password is Required'}))
                 return
             }
         } else {
-            res.send(JSON.stringify({information: 'Username is Too Big'}))
+            res.send(JSON.stringify({information: 'Username has Invalid Letters'}))
             return
         }
     } else {
-        res.send(JSON.stringify({information: 'Username is Already Taken'}))
+        res.send(JSON.stringify({information: 'Username is Too Big'}))
         return
     }
 })
