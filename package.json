@@ -1,7 +1,7 @@
 {
   "name": "centri",
   "scripts": {
-        "start": "node index.js"
+        "start": "node app.js"
     },
   "dependencies": {
     "dotenv": "^16.4.5",
