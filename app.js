@@ -6,6 +6,7 @@ const server = require('http').createServer(app)
 const io = require('socket.io')(server)
 const dotenv = require('dotenv')
 const mysql = require('mysql')
+const crypto = require('crypto');
 dotenv.config()
 
 app.set('views', path.join(__dirname, 'public'))
@@ -26,7 +27,7 @@ const validChars = process.env.VALID_CHARS
 const validUsernameChars = process.env.VALID_UNAME_CHARS
 
 async function executeSQL(sql){
-  var connection = mysql.createConnection({
+  let connection = mysql.createConnection({
       host: databaseUrl,
       user: username,
       password: password,
@@ -64,7 +65,7 @@ function randomString(length) {
 }
 
 function hash(string) {
-    return createHash('sha256').update(string).digest('hex')
+    return crypto.createHash('sha256').update(string).digest('hex')
 }
 
 function base64Image(file){
@@ -93,10 +94,24 @@ function checkCharacters(inputString) {
     return !characterList.test(inputString)
 }
 
+async function checkCurrentUsername(checkUsername){
+    const sqlCheck = await executeSQL('SELECT * FROM Centri.accounting WHERE checkUsername="' + checkUsername + '";')
+    if (sqlCheck[0]) {
+        return false
+    } else {
+        return true
+    }
+}
+
 app.get('/', async function(req, res){
     console.log('Sending [GET]: /')
-    console.log(await executeSQL('SHOW TABLES IN Centri;'))
     res.render('index')
+})
+
+app.get('/signup', async function(req, res){
+    console.log('Sending [GET]: /signup')
+    console.log(await executeSQL('SELECT * FROM Centri.accounting;'))
+    res.render('signup')
 })
 
 app.post('/newsignup', async function(req, res){
@@ -107,7 +122,7 @@ app.post('/newsignup', async function(req, res){
     let checkUsername = username.toLowerCase()
     let hashedPassword = hash(password)
     let hashedCheckUsername = hash(checkUsername)
-    let token = hashedCheckUsername+ '.' + newPassword
+    let token = hashedCheckUsername+ '.' + hashedPassword
     let encodedUsername = encode(username, key)
 
     if (await checkCurrentUsername(hashedCheckUsername)) {
@@ -118,7 +133,7 @@ app.post('/newsignup', async function(req, res){
         if (checkUsername != null && checkUsername.length < 20) {
             if (checkCharacters(checkUsername)) {
                 if (password.length > 0) {
-                    await executeSQL("INSERT INTO accounting (username, checkUsername, password, token, status) VALUES ('" + encodedUsername + "', '" + hashedCheckUsername + "', '" + hashedPassword + "', '" + token + "', 0);")
+                    await executeSQL("INSERT INTO Centri.accounting (username, checkUsername, password, token, status) VALUES ('" + encodedUsername + "', '" + hashedCheckUsername + "', '" + hashedPassword + "', '" + token + "', 0);")
                     res.send(JSON.stringify({information: 'Signed Up', token: token}))
                     return
                 } else {
@@ -138,6 +153,13 @@ app.post('/newsignup', async function(req, res){
         return
     }
 })
+
+app.use((req, res) => {
+    let page = req.url
+    res.status(404).send(
+        '<center><span style="font-family: Arial; font-size: 24px;">Looked it up, <b>' + page + '</b> was not found. <br><br> <span style="font-size: 18px;"><b>Error 404</b>: Not Found</span></span></center>'
+    ) 
+}) 
 
 server.listen(3000, () => {
   console.log('Centri started on port 3000. https://127.0.0.1:3000/')
