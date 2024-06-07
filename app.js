@@ -123,7 +123,7 @@ app.get('/signup', async function(req, res){
         res.redirect('/home')
         return
     }
-    
+
     console.log('Sending [GET]: /signup')
     res.render('signup')
 })
@@ -201,7 +201,7 @@ app.post('/newsignup', async function(req, res){
         if (checkUsernameCharacters(checkUsername)) {
             if (password.length > 0) {
                 if (await checkCurrentUsername(hashedCheckUsername) == false) {
-                    await executeSQL("INSERT INTO Centri.accounting (username, checkUsername, password, token, status) VALUES ('" + encodedUsername + "', '" + hashedCheckUsername + "', '" + hashedPassword + "', '" + token + "', 0);")
+                    await executeSQL("INSERT INTO Centri.accounting (username, checkUsername, password, token, status, chats) VALUES ('" + encodedUsername + "', '" + hashedCheckUsername + "', '" + hashedPassword + "', '" + token + "', 0, '" + JSON.stringify({"chatCount": 0, "chats": []}) + "');")
                     res.send(JSON.stringify({information: 'Signed Up', token: token}))
                     return
                 } else {
