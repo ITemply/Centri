@@ -118,18 +118,30 @@ app.get('/', async function(req, res){
 })
 
 app.get('/signup', async function(req, res){
+    const cookies = req.cookies
+    if (cookies['token']) {
+        res.redirect('/home')
+        return
+    }
+    
     console.log('Sending [GET]: /signup')
     res.render('signup')
 })
 
 app.get('/signin', async function(req, res){
+    const cookies = req.cookies
+    if (cookies['token']) {
+        res.redirect('/home')
+        return
+    }
+
     console.log('Sending [GET]: /signin')
     res.render('signin')
 })
 
 app.get('/home', async function(req, res){
     console.log('Sending [GET]: /home')
-    res.render('exthome')
+    res.render('home')
 })
 
 app.get('/getcookies', async function(req, res){

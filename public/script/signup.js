@@ -20,7 +20,7 @@ async function signupUser() {
 
     document.getElementById('error').innerHTML = information
 
-    if (information == 'Signed In') {
+    if (information == 'Signed Up') {
         const token = rawResponse.token
         document.cookie = 'username=' + username + '; Secure'
         document.cookie = 'token=' + token + '; Secure'
