@@ -119,7 +119,6 @@ app.get('/', async function(req, res){
 
 app.get('/signup', async function(req, res){
     console.log('Sending [GET]: /signup')
-    console.log(await executeSQL('SELECT * FROM Centri.accounting;'))
     res.render('signup')
 })
 
