@@ -7,6 +7,7 @@ const io = require('socket.io')(server)
 const dotenv = require('dotenv')
 const mysql = require('mysql')
 const crypto = require('crypto');
+const cookieParser = require('cookie-parser')
 dotenv.config()
 
 // 3 = Owner
@@ -18,6 +19,7 @@ app.set('view engine', 'ejs')
 app.use(express.json())
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(express.static(path.join(__dirname, 'public')))
+app.use(cookieParser())
 
 const databaseUrl = process.env.DATABASE_URL
 const username = process.env.USERNAME
@@ -110,6 +112,7 @@ async function checkCurrentUsername(checkUsername){
 }
 
 app.get('/', async function(req, res){
+    res.cookie('centri', 'Centri')
     console.log('Sending [GET]: /')
     res.render('index')
 })
@@ -123,6 +126,23 @@ app.get('/signup', async function(req, res){
 app.get('/signin', async function(req, res){
     console.log('Sending [GET]: /signin')
     res.render('signin')
+})
+
+app.get('/home', async function(req, res){
+    console.log('Sending [GET]: /home')
+    res.render('exthome')
+})
+
+app.get('/getcookies', async function(req, res){
+    const redirectUrl = req.query.url
+    if (redirectUrl === undefined) {
+        res.redirect('/')
+        return
+    }
+
+    console.log('Sending [GET]: /getcookies | REQUESTED URL: ' + redirectUrl)
+    res.cookie('centri', 'Centri')
+    res.redirect(redirectUrl)
 })
 
 app.post('/newsignin', async function(req, res){
@@ -194,7 +214,7 @@ app.post('/newsignup', async function(req, res){
 app.use((req, res) => {
     let page = req.url
     res.status(404).send(
-        '<center><span style="font-family: Arial; font-size: 24px;">Looked it up, <b>' + page + '</b> was not found. <br><br> <span style="font-size: 18px;"><b>Error 404</b>: Not Found</span></span></center>'
+        '<center><br><span style="font-family: Arial; font-size: 24px;">Looked it up, <b>' + page + '</b> was not found. <br><br> <span style="font-size: 18px;"><b>Error 404</b>: Not Found</span></span><br><img style="padding-top: 150px;" src="https://media1.tenor.com/m/QQiopAKBLyUAAAAd/miber.gif"></center>'
     ) 
 }) 
 

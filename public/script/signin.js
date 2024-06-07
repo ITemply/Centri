@@ -22,13 +22,9 @@ async function signinUser() {
 
     if (information == 'Signed In') {
         const token = rawResponse.token
-        localStorage.setItem('username', username)
-        localStorage.setItem('token', token)
-    }
-}
+        document.cookie = 'username=' + username + '; Secure'
+        document.cookie = 'token=' + token + '; Secure'
 
-function checkLoginStatus() {
-    if (localStorage.getItem('token') !== null) {
         window.location.href = '/home'
     }
 }
