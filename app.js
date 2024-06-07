@@ -140,8 +140,17 @@ app.get('/signin', async function(req, res){
 })
 
 app.get('/home', async function(req, res){
-    console.log('Sending [GET]: /home')
-    res.render('home')
+    const token = req.cookies.token
+    if (token) {
+        const userData = await executeSQL('SELECT * FROM Centri.accounting WHERE token="' + token + '"')
+        let encodedUsername = userData[0]['username']
+        let chats = JSON.parse(userData[0]['chats'])
+
+        console.log('Sending [GET]: /home')
+        res.render('home', {serverData: JSON.stringify({'dmUsername': encodedUsername, 'chats': chats})})
+    } else {
+        res.redirect('/')
+    }
 })
 
 app.get('/getcookies', async function(req, res){
@@ -156,8 +165,110 @@ app.get('/getcookies', async function(req, res){
     res.redirect(redirectUrl)
 })
 
+app.post('/createdm', async function(req, res) {
+    const jsonData = req.body
+    let dmUsername = jsonData.dmUsername
+
+    const token = req.cookies.token
+    if (token) {
+        const userData = await executeSQL('SELECT * FROM Centri.accounting WHERE token="' + token + '"')
+        let encodedUsername = userData[0]['username']
+
+        if (dmUsername == encodedUsername) {
+            res.send(JSON.stringify({information: 'Unable to DM Yourself'}))
+            return
+        } else {
+            const checkData = await executeSQL('SELECT * FROM Centri.accounting WHERE username="' + dmUsername + '"')
+            if (checkData[0] === null) {
+                res.send(JSON.stringify({information: 'User Not Found'}))
+                return
+            } else if (checkData[0] === undefined) {
+                res.send(JSON.stringify({information: 'User Not Found'}))
+                return
+            } else {
+                if (dmUsername.lenght <= 0) {
+                    res.send(JSON.stringify({information: 'User is Required to DM'}))
+                    return
+                } else if (dmUsername === null) {
+                    res.send(JSON.stringify({information: 'User is Required to DM'}))
+                    return
+                } else if (dmUsername === undefined) {
+                    res.send(JSON.stringify({information: 'User is Required to DM'}))
+                    return
+                } else {
+                    let checkUserChats = JSON.parse(userData[0]['chats'])
+                    let checkDmChat = JSON.parse(checkData[0]['chats'])['chats']
+                    let chats = checkUserChats['chats']
+
+                    let canDm = true
+                    
+                    if (chats === undefined || chats.length == 0) {
+                        let user = checkData[0]['checkUsername']
+                        let dmer = userData[0]['checkUsername']
+                        let username = decode(checkData[0]['username'], key)
+                        let dmUsername = decode(userData[0]['username'], key)
+                        let randomStringHash = randomString(35)
+                        let randomHash = hash(randomStringHash)
+                        let chatName = username + ', ' + dmUsername
+
+                        let userChats = JSON.parse(userData[0]['chats'])
+                        userChats['chatCount'] = userChats['chatCount'] + 1
+                        userChats['chats'].push(randomHash)
+
+                        let dmChats = JSON.parse(checkData[0]['chats'])
+                        dmChats['chatCount'] = dmChats['chatCount'] + 1
+                        dmChats['chats'].push(randomHash)
+
+                        await executeSQL("INSERT INTO Centri.chats (chatHash, chatName, chatUsers) VALUES ('" + randomHash + "', '" + chatName + "', '" + JSON.stringify({'chatUsers': [user, dmer]}) + "')")
+                        await executeSQL("UPDATE Centri.accounting SET chats='" + JSON.stringify(userChats) + "' WHERE token='" + token + "'")
+                        await executeSQL("UPDATE Centri.accounting SET chats='" + JSON.stringify(dmChats) + "' WHERE checkUsername='" + user + "'")
+
+                        console.log('Sending [POST]: /createdm')
+                        res.send(JSON.stringify({information: 'DM Created', dmHash: randomHash}))
+                        return
+                    } else {
+                        chats.forEach(async function(chat){
+                            if (checkDmChat.includes(chat) && canDm) {
+                                canDm = false
+                                res.send(JSON.stringify({information: 'DM Already Created'}))
+                                return
+                            } else if (canDm) {
+                                let user = checkData[0]['checkUsername']
+                                let dmer = userData[0]['checkUsername']
+                                let username = decode(checkData[0]['username'], key)
+                                let dmUsername = decode(userData[0]['username'], key)
+                                let randomStringHash = randomString(35)
+                                let randomHash = hash(randomStringHash)
+                                let chatName = username + ', ' + dmUsername
+
+                                let userChats = JSON.parse(userData[0]['chats'])
+                                userChats['chatCount'] = userChats['chatCount'] + 1
+                                userChats['chats'].push(randomHash)
+
+                                let dmChats = JSON.parse(checkData[0]['chats'])
+                                dmChats['chatCount'] = dmChats['chatCount'] + 1
+                                dmChats['chats'].push(randomHash)
+
+                                await executeSQL("INSERT INTO Centri.chats (chatHash, chatName, chatUsers) VALUES ('" + randomHash + "', '" + chatName + "', '" + JSON.stringify({'chatUsers': [user, dmer]}) + "')")
+                                await executeSQL("UPDATE Centri.accounting SET chats='" + JSON.stringify(userChats) + "' WHERE token='" + token + "'")
+                                await executeSQL("UPDATE Centri.accounting SET chats='" + JSON.stringify(dmChats) + "' WHERE checkUsername='" + user + "'")
+
+                                console.log('Sending [POST]: /createdm')
+                                res.send(JSON.stringify({information: 'DM Created', dmHash: randomHash}))
+                                return
+                            }
+                        })
+                    }
+                }
+            }
+        }
+    } else {
+        res.redirect('/')
+    }
+})
+
 app.post('/newsignin', async function(req, res){
-    console.log('Sending [POST]: New Sign Up')
+    console.log('Sending [POST]: /newsignin')
     const jsonData = req.body
     let username = jsonData.username
     let password = jsonData.password
@@ -183,7 +294,7 @@ app.post('/newsignin', async function(req, res){
 })
 
 app.post('/newsignup', async function(req, res){
-    console.log('Sending [POST]: New Sign Up')
+    console.log('Sending [POST]: /newsignup')
     const jsonData = req.body
     let username = jsonData.username
     let password = jsonData.password
