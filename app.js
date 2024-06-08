@@ -15,6 +15,7 @@ dotenv.config()
 // 1 = Moderator
 
 app.set('views', path.join(__dirname, 'public'))
+app.use('/images', express.static('images'));
 app.set('view engine', 'ejs')
 app.use(express.json())
 app.use(bodyParser.urlencoded({ extended: false }))
