@@ -1,0 +1,16 @@
+.mainHead {
+    font-family: Arial; 
+    font-size: 24px;
+}
+
+.bottomText {
+    font-family: Arial; 
+    font-size: 18px;
+}
+
+.homeA {
+    font-family: Arial; 
+    font-size: 18px;
+    text-decoration: none;
+    color: rgb(55, 108, 224);
+}

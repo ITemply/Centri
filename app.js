@@ -336,9 +336,7 @@ app.post('/newsignup', async function(req, res){
 
 app.use((req, res) => {
     let page = req.url
-    res.status(404).send(
-        '<center><br><span style="font-family: Arial; font-size: 24px;">Looked it up, <b>' + page + '</b> was not found. <br><br> <span style="font-size: 18px;"><b>Error 404</b>: Not Found</span></span><br><img style="padding-top: 150px;" src="https://media1.tenor.com/m/QQiopAKBLyUAAAAd/miber.gif"></center>'
-    ) 
+    res.status(404).render('404', {page: page}) 
 }) 
 
 server.listen(3000, () => {
