@@ -29,6 +29,7 @@ const port = process.env.PORT
 
 const algorithm = process.env.ALG
 const key = process.env.KEY
+const iv = process.env.IV
 
 const validChars = process.env.VALID_CHARS
 const validUsernameChars = process.env.VALID_UNAME_CHARS
@@ -79,17 +80,21 @@ function base64Image(file){
     return fs.readFileSync(file, 'base64')
 }
 
-function encode(text, algkey) {
-    const cipher = crypto.createCipher(algorithm, algkey)  
-    const  encrypted = cipher.update(text, 'utf8', 'hex') + cipher.final('hex')
-    return encrypted
-}
+function encode(text) {
+    let base = btoa(text)
+    let cipher = crypto.createCipheriv(algorithm, key, iv)
+    let encrypted = cipher.update(base)
+    encrypted = Buffer.concat([encrypted, cipher.final()])
+    return encrypted.toString('hex')
+ }
 
-function decode(text, algkey) {
-    const  decipher = crypto.createDecipher(algorithm, algkey)
-    const decrypted = decipher.update(text, 'hex', 'utf8') + decipher.final('utf8')
-    return decrypted
-}
+function decode(text) {
+    let encryptedText = Buffer.from(text, 'hex')
+    let decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
+    let decrypted = decipher.update(encryptedText)
+    decrypted = Buffer.concat([decrypted, decipher.final()])
+    return atob(decrypted.toString())
+ }
 
 function checkUsernameCharacters(inputString) {
     const characterList = new RegExp(`[^${validUsernameChars}]`, 'g')
