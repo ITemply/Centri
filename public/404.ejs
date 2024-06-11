@@ -8,7 +8,7 @@
 
 <script src="script/404.js"></script>
 
-<body>
+<body onload="load404()">
     <center>
         <br>
         <span class="mainHead">Looked it up, <b><%- page %></b> was not found. </span>
@@ -16,8 +16,8 @@
         <span class="bottomText"><b>Error 404</b>: Not Found</span>
         <br><br>
         <a href="/home" class="homeA">Home?</a>
-        <br>
-        <img style="padding-top: 150px;" src="images/static/hand-raise.gif">
+        <br><br>
+        <img src="" id="hand-raiseImage">
     </center>
 </body>
 

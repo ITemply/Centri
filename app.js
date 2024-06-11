@@ -156,7 +156,7 @@ app.get('/home', async function(req, res){
 
         for (const chatInt in chats['chats']) {
             let currentChat = await executeSQL('SELECT * FROM Centri.chats WHERE chatHash ="' + chats['chats'][chatInt] + '"')
-            htmlChats += '<div class="chat"><span class="chatName">' + currentChat[0]['chatName'] + '</span><br><input type="button" value="Open Chat" class="chatButton" onlick="openChat("' + chats['chats'][chatInt] + '")"></div>'
+            htmlChats += '<div class="chat"><span class="chatName">' + currentChat[0]['chatName'] + '</span><br><input type="button" value="Open Chat" class="chatButton" onclick="openChat(`' + chats['chats'][chatInt] + '`)"></div>'
         }
 
         console.log('Sending [GET]: /home')
@@ -176,6 +176,30 @@ app.get('/getcookies', async function(req, res){
     console.log('Sending [GET]: /getcookies | REQUESTED URL: ' + redirectUrl)
     res.cookie('centri', 'Centri')
     res.redirect(redirectUrl)
+})
+
+app.get('/chat', async function(req, res){
+    res.redirect('/home?backType=2')
+})
+
+app.get('/chat/:chatHash', async function(req, res){
+    const token = req.cookies.token
+    if (token) {
+        const userData = await executeSQL('SELECT * FROM Centri.accounting WHERE token="' + token + '"')
+        const chatHash = req.params.chatHash
+        const userChats = JSON.parse(userData[0]['chats'])
+
+        for (const chatInt in userChats['chats']) {
+            if (userChats['chats'][chatInt] == chatHash) {
+                console.log('Sending [GET]: /chat')
+                res.render('chat', {})
+                return
+            }
+        }
+        res.redirect('/home?backType=1')
+    } else {
+        res.redirect('/')
+    }
 })
 
 app.post('/createdm', async function(req, res) {

@@ -9,6 +9,18 @@ function signOut() {
 
 function loadData() {
     serverData = JSON.parse(document.getElementById('serverData').innerHTML)
+
+    const queryString = window.location.search
+    const urlParams = new URLSearchParams(queryString)
+
+    if (urlParams.has('backType')) {
+        const backType = urlParams.get('backType')
+        if (backType == 1) {
+            document.getElementById('error').innerHTML = 'Unauthorized Access to Chat URL'
+        } else if (backType == 2) {
+            document.getElementById('error').innerHTML = 'Chat Hash is Required to Chat'
+        }
+    }
 }
 
 async function createDM() {
@@ -40,4 +52,8 @@ async function createDM() {
     const information = rawResponse.information
 
     document.getElementById('error').innerHTML = information
+}
+
+function openChat(id) {
+    window.location.href = '/chat/' + id
 }
