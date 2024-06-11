@@ -152,8 +152,15 @@ app.get('/home', async function(req, res){
         let encodedUsername = userData[0]['username']
         let chats = JSON.parse(userData[0]['chats'])
 
+        let htmlChats = ''
+
+        for (const chatInt in chats['chats']) {
+            let currentChat = await executeSQL('SELECT * FROM Centri.chats WHERE chatHash ="' + chats['chats'][chatInt] + '"')
+            htmlChats += '<div class="chat"><span class="chatName">' + currentChat[0]['chatName'] + '</span><br><input type="button" value="Open Chat" class="chatButton" onlick="openChat("' + chats['chats'][chatInt] + '")"></div>'
+        }
+
         console.log('Sending [GET]: /home')
-        res.render('home', {serverData: JSON.stringify({'dmUsername': encodedUsername, 'chats': chats})})
+        res.render('home', {serverData: JSON.stringify({'dmUsername': encodedUsername, 'chats': chats}), htmlChats: htmlChats})
     } else {
         res.redirect('/')
     }
