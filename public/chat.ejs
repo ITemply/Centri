@@ -3,14 +3,23 @@
 <head>
     <title>Centri - Chat</title>
     <link rel="icon" type="image/x-icon" href="../images/logos/Centri-Light.ico">
-    <link rel="stylesheet" href="style/chat.css">
+    <link rel="stylesheet" href="../style/chat.css">
 </head>
 
-<script src="script/chat.js"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="../script/chat.js"></script>
 
-<body>
+<body onload="loadData()">
     <span>Hello from Centri!</span>
+    <h3><%- connectedWith %></h3>
+    <div class="messageBox" id="messageBox">
+        <%- messages %>
+    </div>
     <br>
+    <input type="text" placeholder="message here" id="message" class="messageInput">
+    <input type="button" value="Send Message" id="messageSendButton" class="messageSendButton" onclick="sendMessage()">
+    <br><br>
+    <span class="serverData" id="serverData"><%- serverData %></span>
 </body>
 
 </html>

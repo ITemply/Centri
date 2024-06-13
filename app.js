@@ -6,7 +6,7 @@ const server = require('http').createServer(app)
 const io = require('socket.io')(server)
 const dotenv = require('dotenv')
 const mysql = require('mysql')
-const crypto = require('crypto');
+const crypto = require('crypto')
 const cookieParser = require('cookie-parser')
 dotenv.config()
 
@@ -80,17 +80,17 @@ function base64Image(file){
     return fs.readFileSync(file, 'base64')
 }
 
-function encode(text) {
+function encode(text, ekey, eiv) {
     let base = btoa(text)
-    let cipher = crypto.createCipheriv(algorithm, key, iv)
+    let cipher = crypto.createCipheriv(algorithm, ekey, eiv)
     let encrypted = cipher.update(base)
     encrypted = Buffer.concat([encrypted, cipher.final()])
     return encrypted.toString('hex')
  }
 
-function decode(text) {
+function decode(text, dkey, div) {
     let encryptedText = Buffer.from(text, 'hex')
-    let decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
+    let decipher = crypto.createDecipheriv('aes-256-cbc', dkey, div)
     let decrypted = decipher.update(encryptedText)
     decrypted = Buffer.concat([decrypted, decipher.final()])
     return atob(decrypted.toString())
@@ -151,12 +151,15 @@ app.get('/home', async function(req, res){
         const userData = await executeSQL('SELECT * FROM Centri.accounting WHERE token="' + token + '"')
         let encodedUsername = userData[0]['username']
         let chats = JSON.parse(userData[0]['chats'])
+        let username = decode(userData[0]['username'], key, iv)
 
         let htmlChats = ''
 
         for (const chatInt in chats['chats']) {
             let currentChat = await executeSQL('SELECT * FROM Centri.chats WHERE chatHash ="' + chats['chats'][chatInt] + '"')
-            htmlChats += '<div class="chat"><span class="chatName">' + currentChat[0]['chatName'] + '</span><br><input type="button" value="Open Chat" class="chatButton" onclick="openChat(`' + chats['chats'][chatInt] + '`)"></div>'
+            let updatedSendTo = currentChat[0]['chatName'].replace(', ', '')
+            let connectedWith = 'DM to <b>' + updatedSendTo.replace(username, '') + '</b>'
+            htmlChats += '<div class="chat"><span class="chatName">' + connectedWith + '</span><br><input type="button" value="Open Chat" class="chatButton" onclick="openChat(`' + chats['chats'][chatInt] + '`)"></div>'
         }
 
         console.log('Sending [GET]: /home')
@@ -188,11 +191,45 @@ app.get('/chat/:chatHash', async function(req, res){
         const userData = await executeSQL('SELECT * FROM Centri.accounting WHERE token="' + token + '"')
         const chatHash = req.params.chatHash
         const userChats = JSON.parse(userData[0]['chats'])
+        const username = decode(userData[0]['username'], key, iv)
 
         for (const chatInt in userChats['chats']) {
             if (userChats['chats'][chatInt] == chatHash) {
+                const chatData = await executeSQL('SELECT * FROM Centri.chats WHERE chatHash="' + chatHash + '"')
+                const messages = await executeSQL('SELECT * FROM Centri.messages WHERE chat="' + chatHash + '"')
+                let updatedSendTo = chatData[0]['chatName'].replace(', ', '')
+                let connectedWith = 'DM to ' + updatedSendTo.replace(username, '')
+
+                let messageString = ''
+
+                for (const messageInt in messages) {
+                    const message = messages[messageInt]
+                    let messageData = decode(message['messageContent'], key, iv)
+                    let messageHash = message['messageHash']
+                    let messageType = message['messageType']
+                    let messageSender = message['messageSender']
+                    let username = decode(message['messageUser'], key, iv)
+                    let sentTime = message['sendingTime']
+                    let seconds = new Date().getTime() / 1000
+                    let day3Seconds = 129600
+
+                    let canDelete = ''
+
+                    if (sentTime < seconds - day3Seconds) {
+                        await executeSQL('DELETE FROM Centri.messages WHERE messageHash="' + messageHash + '"')
+                    }
+
+                    if (userData[0]['checkUsername'] == messageSender) {
+                        canDelete = '<input type="button" value="Delete Message" id="deleteMessage" class="deleteMessage" onclick="deleteMessage(`' + messageHash + '`)">'
+                    }
+
+                    if (messageType == 1) {
+                        messageString += '<div class="message" id="' + messageHash + '"><span class="username" id="username">' + username + ':</span> <span class="messageData">' + messageData + '</span> ' + canDelete + '</div>'
+                    }
+                }
+
                 console.log('Sending [GET]: /chat')
-                res.render('chat', {})
+                res.render('chat', {serverData: JSON.stringify({'chatHash': chatHash}), messages: messageString, connectedWith: connectedWith})
                 return
             }
         }
@@ -202,7 +239,7 @@ app.get('/chat/:chatHash', async function(req, res){
     }
 })
 
-app.post('/createdm', async function(req, res) {
+app.post('/api/createdm', async function(req, res) {
     const jsonData = req.body
     let dmUsername = jsonData.dmUsername
 
@@ -242,8 +279,8 @@ app.post('/createdm', async function(req, res) {
                     if (chats === undefined || chats.length == 0) {
                         let user = checkData[0]['checkUsername']
                         let dmer = userData[0]['checkUsername']
-                        let username = decode(checkData[0]['username'], key)
-                        let dmUsername = decode(userData[0]['username'], key)
+                        let username = decode(checkData[0]['username'], key, iv)
+                        let dmUsername = decode(userData[0]['username'], key, iv)
                         let randomStringHash = randomString(35)
                         let randomHash = hash(randomStringHash)
                         let chatName = username + ', ' + dmUsername
@@ -260,7 +297,7 @@ app.post('/createdm', async function(req, res) {
                         await executeSQL("UPDATE Centri.accounting SET chats='" + JSON.stringify(userChats) + "' WHERE token='" + token + "'")
                         await executeSQL("UPDATE Centri.accounting SET chats='" + JSON.stringify(dmChats) + "' WHERE checkUsername='" + user + "'")
 
-                        console.log('Sending [POST]: /createdm')
+                        console.log('Sending [POST]: /api/createdm')
                         res.send(JSON.stringify({information: 'DM Created', dmHash: randomHash}))
                         return
                     } else {
@@ -272,8 +309,8 @@ app.post('/createdm', async function(req, res) {
                             } else if (canDm) {
                                 let user = checkData[0]['checkUsername']
                                 let dmer = userData[0]['checkUsername']
-                                let username = decode(checkData[0]['username'], key)
-                                let dmUsername = decode(userData[0]['username'], key)
+                                let username = decode(checkData[0]['username'], key, iv)
+                                let dmUsername = decode(userData[0]['username'], key, iv)
                                 let randomStringHash = randomString(35)
                                 let randomHash = hash(randomStringHash)
                                 let chatName = username + ', ' + dmUsername
@@ -304,8 +341,8 @@ app.post('/createdm', async function(req, res) {
     }
 })
 
-app.post('/newsignin', async function(req, res){
-    console.log('Sending [POST]: /newsignin')
+app.post('/api/newsignin', async function(req, res){
+    console.log('Sending [POST]: /api/newsignin')
     const jsonData = req.body
     let username = jsonData.username
     let password = jsonData.password
@@ -330,8 +367,8 @@ app.post('/newsignin', async function(req, res){
     }
 })
 
-app.post('/newsignup', async function(req, res){
-    console.log('Sending [POST]: /newsignup')
+app.post('/api/newsignup', async function(req, res){
+    console.log('Sending [POST]: /api/newsignup')
     const jsonData = req.body
     let username = jsonData.username
     let password = jsonData.password
@@ -339,7 +376,7 @@ app.post('/newsignup', async function(req, res){
     let hashedPassword = hash(password)
     let hashedCheckUsername = hash(checkUsername)
     let token = hashedCheckUsername+ '.' + hashedPassword
-    let encodedUsername = encode(username, key)
+    let encodedUsername = encode(username, key, iv)
 
     if (checkUsername.length == 0) {
         res.send(JSON.stringify({information: 'A Username is Required'}))
@@ -370,10 +407,160 @@ app.post('/newsignup', async function(req, res){
     }
 })
 
+app.post('/api/encode', async function(req, res){
+    console.log('Sending [POST]: /api/encode')
+    const token = req.cookies.token
+    if (token) {
+        const jsonData = req.body
+        let text = jsonData.text
+
+        const sqlCheck = await executeSQL('SELECT * FROM Centri.accounting WHERE token="' + token + '";')
+        if (sqlCheck[0] === null) {
+            res.send(JSON.stringify({'information': 'Rejected'}))
+            return 
+        } else if (sqlCheck[0] === undefined) {
+            res.send(JSON.stringify({'information': 'Rejected'}))
+            return
+        } else {
+            const encrypted = encode(text, key, iv)
+            res.send(JSON.stringify({'information': encrypted}))
+            return
+        }
+    } else {
+        res.send(JSON.stringify({'information': 'Rejected'}))
+        return
+    }
+})
+
+app.post('/api/deletemessage', async function(req, res){
+    console.log('Sending [POST]: /api/deletemessage')
+    const token = req.cookies.token
+    if (token) {
+        const jsonData = req.body
+        let messageHash = jsonData.messageHash
+        let chatHash = jsonData.chatHash
+
+        const sqlCheck = await executeSQL('SELECT * FROM Centri.accounting WHERE token="' + token + '"')
+
+        if (sqlCheck[0] === null) {
+            res.send(JSON.stringify({'information': 'Rejected Token'}))
+            return 
+        } else if (sqlCheck[0] === undefined) {
+            res.send(JSON.stringify({'information': 'Rejected Token'}))
+            return
+        } else {
+            const chats = JSON.parse(sqlCheck[0]['chats'])['chats']
+            if (chats.includes(chatHash)) {
+                const message = await executeSQL('SELECT * FROM Centri.messages WHERE messageHash="' + messageHash + '"')
+                if (message[0] === null) {
+                    res.send(JSON.stringify({'information': 'Rejected Message'}))
+                    return 
+                } else if (message[0] === undefined) {
+                    res.send(JSON.stringify({'information': 'Rejected Message'}))
+                    return
+                } else {
+                    await executeSQL('DELETE FROM Centri.messages WHERE messageHash="' + messageHash + '"')
+                    io.emit('deleteMessage', JSON.stringify({'chatHash': chatHash, 'messageHash': messageHash}))
+                    res.send(JSON.stringify({'information': 'Deletion Success'}))
+                    return
+                }
+            } else {
+                res.send(JSON.stringify({'information': 'Unauthorized Request'}))
+                return
+            }
+        }
+    } else {
+        res.send(JSON.stringify({'information': 'Rejected Token'}))
+        return
+    }
+})
+
+app.post('/api/getmessage', async function(req, res){
+    console.log('Sending [POST]: /api/getmessage')
+    const token = req.cookies.token
+    if (token) {
+        const jsonData = req.body
+        let chatHash = jsonData.chatHash
+        let messageHash = jsonData.messageHash
+
+        const sqlCheck = await executeSQL('SELECT * FROM Centri.accounting WHERE token="' + token + '";')
+        if (sqlCheck[0] === null) {
+            res.send(JSON.stringify({'information': 'Rejected Token'}))
+            return 
+        } else if (sqlCheck[0] === undefined) {
+            res.send(JSON.stringify({'information': 'Rejected Token'}))
+            return
+        } else {
+            const chats = JSON.parse(sqlCheck[0]['chats'])['chats']
+            if (chats.includes(chatHash)) {
+                let messageString = ''
+                let canDelete = ''
+
+                const messageData = await executeSQL('SELECT * FROM Centri.messages WHERE messageHash="' + messageHash + '"')
+                let username = decode(messageData[0]['messageUser'], key, iv)
+                let messageSender = messageData[0]['messageSender']
+                let messageType = messageData[0]['messageType']
+                let messageContent = decode(messageData[0]['messageContent'], key, iv)
+
+                if (sqlCheck[0]['checkUsername'] == messageSender) {
+                    canDelete = '<input type="button" value="Delete Message" id="deleteMessage" class="deleteMessage" onclick="deleteMessage(`' + messageHash + '`)">'
+                }
+                if (messageType == 1) {
+                    messageString += '<div class="message" id="' + messageHash + '"><span class="username" id="username">' + username + ':</span> <span class="messageData">' + messageContent + '</span> ' + canDelete + '</div>'
+                }
+
+                res.send(JSON.stringify({'information': messageString}))
+                return
+            } else {
+                res.send(JSON.stringify({'information': 'Invalid Chat'}))
+                return
+            }
+        }
+    } else {
+        res.send(JSON.stringify({'information': 'Rejected'}))
+        return
+    }
+})
+
 app.use((req, res) => {
     let page = req.url
     res.status(404).render('404', {page: page}) 
-}) 
+})
+
+io.on('connection', async function(socket){
+    socket.on('newMessage', async function(messageDetails){
+        const jsonData = JSON.parse(messageDetails)
+        let message = decode(jsonData.message, key, iv)
+        let chatHash = jsonData.chatHash
+        let token = jsonData.token
+
+        if (token) {
+            const sqlCheck = await executeSQL('SELECT * FROM Centri.accounting WHERE token="' + token + '";')
+            if (sqlCheck[0] === null) {
+                return
+            } else if (sqlCheck[0] === undefined) {
+                return
+            } else {
+                if (checkCharacters(message)) {
+                    if (message.length > 0 && message != '') {
+                        let randomStringHash = randomString(35)
+                        let randomHash = hash(randomStringHash)
+                        let messageContent = encode(message, key, iv)
+                        let messageSender = sqlCheck[0]['checkUsername']
+                        let messageUser = sqlCheck[0]['username']
+                        let seconds = new Date().getTime() / 1000
+
+                        await executeSQL('INSERT INTO Centri.messages (messageHash, messageContent, messageSender, messageType, chat, messageUser, sendingTime) VALUES ("' + randomHash + '", "' + messageContent + '", "' + messageSender + '", 1, "' + chatHash + '", "' + messageUser + '", ' + seconds + ')')
+                        io.emit('callMessage', JSON.stringify({'chat': chatHash, 'messageHash': randomHash}))
+                        return
+                    }
+                }
+            }
+        } else {
+            return
+        }
+    })
+})
 
 server.listen(3000, () => {
   console.log('Centri started on port 3000. https://127.0.0.1:3000/')

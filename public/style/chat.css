@@ -1,0 +1,21 @@
+.messageBox {
+    width: 750px;
+    height: 350px;
+    border: 2px solid black;
+    overflow-x: hidden;
+    overflow-y: scroll;
+}
+
+.messageInput {
+    width: 650px;
+    padding: 5px
+}
+
+.messageSendButton {
+    width: 100px;
+    padding: 5px
+}
+
+.message {
+    padding: 3px;
+}

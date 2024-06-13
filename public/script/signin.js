@@ -5,7 +5,7 @@ async function signinUser() {
 
     document.getElementById('error').innerHTML = ''
 
-    const response = await fetch('/newsignin', {
+    const response = await fetch('/api/newsignin', {
         method: 'POST',
         headers: {
             'Accept': 'application/json',

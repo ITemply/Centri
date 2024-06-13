@@ -38,7 +38,7 @@ async function createDM() {
 
     // e58af0a29dce251bd21faa9c03ee274e
 
-    const response = await fetch('/createdm', {
+    const response = await fetch('/api/createdm', {
         method: 'POST',
         headers: {
             'Accept': 'application/json',

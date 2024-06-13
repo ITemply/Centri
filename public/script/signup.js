@@ -5,7 +5,7 @@ async function signupUser() {
 
     document.getElementById('error').innerHTML = ''
     
-    const response = await fetch('/newsignup', {
+    const response = await fetch('/api/newsignup', {
         method: 'POST',
         headers: {
             'Accept': 'application/json',
