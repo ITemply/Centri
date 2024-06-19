@@ -3,7 +3,7 @@ const path = require('node:path')
 const bodyParser = require('body-parser')
 const app = express()
 const server = require('http').createServer(app)
-const io = require('socket.io')(server)
+const io = require('socket.io')(server, {maxHttpBufferSize: 3.05e6, pingTimeout: 60000})
 const dotenv = require('dotenv')
 const mysql = require('mysql')
 const crypto = require('crypto')
@@ -17,8 +17,6 @@ dotenv.config()
 app.set('views', path.join(__dirname, 'public'))
 app.use('/images', express.static('images'));
 app.set('view engine', 'ejs')
-app.use(bodyParser.json({limit: '35mb'}));
-app.use(bodyParser.urlencoded({limit: '35mb', extended: true}));
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(express.static(path.join(__dirname, 'public')))
 app.use(cookieParser())
@@ -46,7 +44,7 @@ const sqlConnection = mysql.createPool({
 async function executeSQL(sql){
   return new Promise((resolve, reject) =>{
       try{
-        sqlConnection.query(sql, function (err, result) {
+        sqlConnection.query(sql, function(err, result) {
             if (err){
                 return reject(err)
             }

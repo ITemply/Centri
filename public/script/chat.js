@@ -85,6 +85,8 @@ async function deleteMessage(messageHash) {
 }
 
 async function loadMedia(mediaHash) {
+    document.getElementById(mediaHash).style.display = 'none'
+
     const response = await fetch('/api/getmedia', {
         method: 'POST',
         headers: {
@@ -104,6 +106,9 @@ async function loadMedia(mediaHash) {
 
     document.getElementById(mediaHash).src = mediaURL
     document.getElementById('a-' + mediaHash).href = mediaURL
+
+    document.getElementById(mediaHash).style.display = 'inline'
+    document.getElementById('loader-' + mediaHash).style.display = 'none'
 }
 
 async function uploadMessage() {
@@ -122,7 +127,7 @@ async function uploadMessage() {
   
         const fileData = {'fileData': b64, 'chatHash': serverData['chatHash'], 'token': token}
     
-        socket.emit('newFile', JSON.stringify(fileData))
+        socket.emit('newFile', fileData)
         document.getElementById('imageData').innerHTML = 'File Uploaded'
       } else {
         document.getElementById('imageData').innerHTML = ''
