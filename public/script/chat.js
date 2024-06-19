@@ -1,4 +1,4 @@
-const socket = io()
+var socket = io()
 
 socket.on('disconnect', function(){
     socket = io()
@@ -31,6 +31,18 @@ async function encode(text){
     return information
 }
 
+function base64ToBlob(base64String, contentType = '') {
+    const byteCharacters = atob(base64String);
+    const byteArrays = [];
+
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteArrays.push(byteCharacters.charCodeAt(i));
+    }
+
+    const byteArray = new Uint8Array(byteArrays);
+    return new Blob([byteArray], { type: contentType });
+}
+
 function getCookie(cname) {
     let name = cname + '='
     let decodedCookie = decodeURIComponent(document.cookie)
@@ -55,9 +67,9 @@ async function sendMessage() {
 
     const sendingData = JSON.stringify({'message': encodedMessage, 'chatHash': serverData['chatHash'], 'token': token})
 
-    socket.emit('newMessage', sendingData)
-
     document.getElementById('message').value = ''
+
+    socket.emit('newMessage', sendingData)
 }
 
 async function deleteMessage(messageHash) {
@@ -70,6 +82,54 @@ async function deleteMessage(messageHash) {
         body: JSON.stringify({chatHash: serverData['chatHash'], messageHash: messageHash}),
         cache: 'default'
     })
+}
+
+async function loadMedia(mediaHash) {
+    const response = await fetch('/api/getmedia', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({mediaHash: mediaHash}),
+        cache: 'default'
+    })
+
+    const rawResponse = await response.json()
+    const information = rawResponse.information
+    let mediaData = information.mediaData
+
+    const mediaBlob = base64ToBlob(mediaData.split(',')[1], 'image/png')
+    const mediaURL = URL.createObjectURL(mediaBlob)
+
+    document.getElementById(mediaHash).src = mediaURL
+    document.getElementById('a-' + mediaHash).href = mediaURL
+}
+
+async function uploadMessage() {
+    const fileinput = document.getElementById('uploadfileid').files[0]
+
+    document.getElementById('imageData').innerHTML = fileinput.name
+  
+    reader = new FileReader();
+  
+    reader.onloadend = async function() {
+      var b64 = reader.result
+      response = confirm('Are you sure you want to upload the file, ' + fileinput.name + '?')
+  
+      if (response) {
+        const token = getCookie('token')
+  
+        const fileData = {'fileData': b64, 'chatHash': serverData['chatHash'], 'token': token}
+    
+        socket.emit('newFile', JSON.stringify(fileData))
+        document.getElementById('imageData').innerHTML = 'File Uploaded'
+      } else {
+        document.getElementById('imageData').innerHTML = ''
+      }
+    }
+  
+    reader.readAsDataURL(fileinput);
 }
 
 socket.on('callMessage', async function(callData){
@@ -116,3 +176,10 @@ socket.on('deleteMessage', async function(deleteData){
         document.getElementById(messageHash).remove()
     }
 })
+
+document.addEventListener('keypress', async function(event) {
+    if (event.key === 'Enter') {
+        await sendMessage()
+    } 
+  })
+  

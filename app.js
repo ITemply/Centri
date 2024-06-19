@@ -17,7 +17,8 @@ dotenv.config()
 app.set('views', path.join(__dirname, 'public'))
 app.use('/images', express.static('images'));
 app.set('view engine', 'ejs')
-app.use(express.json())
+app.use(bodyParser.json({limit: '35mb'}));
+app.use(bodyParser.urlencoded({limit: '35mb', extended: true}));
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(express.static(path.join(__dirname, 'public')))
 app.use(cookieParser())
@@ -34,23 +35,23 @@ const iv = process.env.IV
 const validChars = process.env.VALID_CHARS
 const validUsernameChars = process.env.VALID_UNAME_CHARS
 
-async function executeSQL(sql){
-  let connection = mysql.createConnection({
-      host: databaseUrl,
-      user: username,
-      password: password,
-      port: port
-  })
+const sqlConnection = mysql.createPool({
+    connectionLimit: 100,
+    host: databaseUrl,
+    user: username,
+    password: password,
+    port: port
+})
 
+async function executeSQL(sql){
   return new Promise((resolve, reject) =>{
       try{
-          connection.query(sql, function (err, result) {
-              if (err){
-                  return reject(err)
-              }
-              connection.end()
-              return resolve(result)
-          })
+        sqlConnection.query(sql, function (err, result) {
+            if (err){
+                return reject(err)
+            }
+            return resolve(result)
+        })
       }
       catch(e){
           reject(e)
@@ -159,7 +160,7 @@ app.get('/home', async function(req, res){
             let currentChat = await executeSQL('SELECT * FROM Centri.chats WHERE chatHash ="' + chats['chats'][chatInt] + '"')
             let updatedSendTo = currentChat[0]['chatName'].replace(', ', '')
             let connectedWith = 'DM to <b>' + updatedSendTo.replace(username, '') + '</b>'
-            htmlChats += '<div class="chat"><span class="chatName">' + connectedWith + '</span><br><input type="button" value="Open Chat" class="chatButton" onclick="openChat(`' + chats['chats'][chatInt] + '`)"></div>'
+            htmlChats += '<div class="chat"><span class="chatName">' + connectedWith + '</span><br><input type="button" value="Open Chat" class="chatButton" onclick="openChat(`' + chats['chats'][chatInt] + '`)"> <input type="button" value="Close Chat" class="chatButton" onclick="closeChat(`' + chats['chats'][chatInt] + '`)"></div>'
         }
 
         console.log('Sending [GET]: /home')
@@ -182,6 +183,7 @@ app.get('/getcookies', async function(req, res){
 })
 
 app.get('/chat', async function(req, res){
+    console.log('SENDING [GET]: /chat')
     res.redirect('/home?backType=2')
 })
 
@@ -204,31 +206,44 @@ app.get('/chat/:chatHash', async function(req, res){
 
                 for (const messageInt in messages) {
                     const message = messages[messageInt]
-                    let messageData = decode(message['messageContent'], key, iv)
                     let messageHash = message['messageHash']
                     let messageType = message['messageType']
                     let messageSender = message['messageSender']
-                    let username = decode(message['messageUser'], key, iv)
                     let sentTime = message['sendingTime']
                     let seconds = new Date().getTime() / 1000
                     let day3Seconds = 129600
+                    
 
                     let canDelete = ''
 
                     if (sentTime < seconds - day3Seconds) {
-                        await executeSQL('DELETE FROM Centri.messages WHERE messageHash="' + messageHash + '"')
-                    }
-
-                    if (userData[0]['checkUsername'] == messageSender) {
-                        canDelete = '<input type="button" value="Delete Message" id="deleteMessage" class="deleteMessage" onclick="deleteMessage(`' + messageHash + '`)">'
-                    }
-
-                    if (messageType == 1) {
-                        messageString += '<div class="message" id="' + messageHash + '"><span class="username" id="username">' + username + ':</span> <span class="messageData">' + messageData + '</span> ' + canDelete + '</div>'
+                        if (messageType == 1) {
+                            await executeSQL('DELETE FROM Centri.messages WHERE messageHash="' + messageHash + '"')
+                        } else if (messageType == 2) {
+                            let messageData = message['messageContent']
+                            await executeSQL('DELETE FROM Centri.messages WHERE messageHash="' + messageHash + '"')
+                            await executeSQL('DELETE FROM Centri.media WHERE mediaHash="' + messageData + '"')
+                        }
+                    } else {
+                        if (userData[0]['checkUsername'] == messageSender) {
+                            canDelete = '<input type="button" value="Delete Message" id="deleteMessage" class="deleteMessage" onclick="deleteMessage(`' + messageHash + '`)">'
+                        }
+    
+                        if (messageType == 1) {
+                            let messageData = decode(message['messageContent'], key, iv)
+                            let username = decode(message['messageUser'], key, iv)
+    
+                            messageString += '<div class="message" id="' + messageHash + '"><span class="username" id="username">' + username + ':</span> <span class="messageData">' + messageData + '</span> ' + canDelete + '</div>'
+                        } else if (messageType == 2) {
+                            let messageData = message['messageContent']
+                            let username = decode(message['messageUser'], key, iv)
+    
+                            messageString += '<div class="message" id="' + messageHash + '"><span class="username" id="username">' + username + ':</span> <a href="" id="a-' + messageData + '" target="_blank" ><img class="sentMedia" src="" onerror="loadMedia(`' + messageData + '`)" id="' + messageData + '"></a> ' + canDelete + '</div>'
+                        }
                     }
                 }
 
-                console.log('Sending [GET]: /chat')
+                console.log('Sending [GET]: /chat/' + chatHash)
                 res.render('chat', {serverData: JSON.stringify({'chatHash': chatHash}), messages: messageString, connectedWith: connectedWith})
                 return
             }
@@ -236,6 +251,44 @@ app.get('/chat/:chatHash', async function(req, res){
         res.redirect('/home?backType=1')
     } else {
         res.redirect('/')
+    }
+})
+
+app.post('/api/getmedia', async function(req, res){
+    const token = req.cookies.token
+    if (token) {
+        const jsonData = req.body
+        let mediaHash = jsonData.mediaHash
+
+        const userData = await executeSQL('SELECT * FROM Centri.accounting WHERE token="' + token + '"')
+
+        if (userData[0] === null) {
+            res.send(JSON.stringify({information: 'User Not Found'}))
+            return
+        } else if (userData[0] === undefined) {
+            res.send(JSON.stringify({information: 'User Not Found'}))
+            return
+        } else {
+            const mediaData = await executeSQL('SELECT * FROM Centri.media WHERE mediaHash="' + mediaHash + '"')
+
+            if (mediaData[0] === null) {
+                res.send(JSON.stringify({'information': '[Unauthorized Media]: An error has been detected in loading a media file. Please wait a day or two for the media file to be cleared.'}))
+                return 
+            } else if (mediaData[0] === undefined) {
+                res.send(JSON.stringify({'information': '[Unauthorized Media]: An error has been detected in loading a media file. Please wait a day or two for the media file to be cleared.'}))
+                return
+            } else {
+                const media = await executeSQL('SELECT CONVERT(media USING utf8) FROM Centri.media WHERE mediaHash="' + mediaHash + '"')
+                const mediaToLoad = media[0]['CONVERT(media USING utf8)']
+
+                console.log('Sending [GET]: /api/getmedia/' + mediaHash)
+                res.send(JSON.stringify({information: {mediaHash: mediaHash, mediaData: mediaToLoad}}))
+                return
+            }
+        }
+    } else {
+        res.redirect('/')
+        return
     }
 })
 
@@ -459,10 +512,20 @@ app.post('/api/deletemessage', async function(req, res){
                     res.send(JSON.stringify({'information': 'Rejected Message'}))
                     return
                 } else {
-                    await executeSQL('DELETE FROM Centri.messages WHERE messageHash="' + messageHash + '"')
-                    io.emit('deleteMessage', JSON.stringify({'chatHash': chatHash, 'messageHash': messageHash}))
-                    res.send(JSON.stringify({'information': 'Deletion Success'}))
-                    return
+                    if (message[0]['messageType'] == 1) {
+                        await executeSQL('DELETE FROM Centri.messages WHERE messageHash="' + messageHash + '"')
+                        io.emit('deleteMessage', JSON.stringify({'chatHash': chatHash, 'messageHash': messageHash}))
+                        res.send(JSON.stringify({'information': 'Deletion Success'}))
+                        return
+                    } else if (message[0]['messageType'] == 2) {
+                        const messageData = await executeSQL('SELECT  * FROM Centri.messages WHERE messageHash="' + messageHash + '"')
+                        const imageHash = messageData[0]['messageContent']
+                        await executeSQL('DELETE FROM Centri.messages WHERE messageHash="' + messageHash + '"')
+                        await executeSQL('DELETE FROM Centri.media WHERE mediaHash="' + imageHash + '"')
+                        io.emit('deleteMessage', JSON.stringify({'chatHash': chatHash, 'messageHash': messageHash}))
+                        res.send(JSON.stringify({'information': 'Deletion Success'}))
+                        return
+                    }
                 }
             } else {
                 res.send(JSON.stringify({'information': 'Unauthorized Request'}))
@@ -497,16 +560,22 @@ app.post('/api/getmessage', async function(req, res){
                 let canDelete = ''
 
                 const messageData = await executeSQL('SELECT * FROM Centri.messages WHERE messageHash="' + messageHash + '"')
-                let username = decode(messageData[0]['messageUser'], key, iv)
                 let messageSender = messageData[0]['messageSender']
                 let messageType = messageData[0]['messageType']
-                let messageContent = decode(messageData[0]['messageContent'], key, iv)
 
                 if (sqlCheck[0]['checkUsername'] == messageSender) {
                     canDelete = '<input type="button" value="Delete Message" id="deleteMessage" class="deleteMessage" onclick="deleteMessage(`' + messageHash + '`)">'
                 }
                 if (messageType == 1) {
+                    let messageContent = decode(messageData[0]['messageContent'], key, iv)
+                    let username = decode(messageData[0]['messageUser'], key, iv)
+
                     messageString += '<div class="message" id="' + messageHash + '"><span class="username" id="username">' + username + ':</span> <span class="messageData">' + messageContent + '</span> ' + canDelete + '</div>'
+                } else if (messageType == 2) {
+                    let messageDat = messageData[0]['messageContent']
+                    let username = decode(messageData[0]['messageUser'], key, iv)
+
+                    messageString += '<div class="message" id="' + messageHash + '"><span class="username" id="username">' + username + ':</span> <a href="" id="a-' + messageDat + '" target="_blank"><img class="sentMedia" src="" onerror="loadMedia(`' + messageDat + '`)" id="' + messageDat + '"></a> ' + canDelete + '</div>'
                 }
 
                 res.send(JSON.stringify({'information': messageString}))
@@ -555,6 +624,37 @@ io.on('connection', async function(socket){
                         return
                     }
                 }
+            }
+        } else {
+            return
+        }
+    })
+
+    socket.on('newFile', async function(fileDetails) {
+        const jsonData = JSON.parse(fileDetails)
+        let fileData = jsonData.fileData
+        let chatHash = jsonData.chatHash
+        let token = jsonData.token
+
+        if (token) {
+            const sqlCheck = await executeSQL('SELECT * FROM Centri.accounting WHERE token="' + token + '";')
+            if (sqlCheck[0] === null) {
+                return
+            } else if (sqlCheck[0] === undefined) {
+                return
+            } else {
+                let randomStringHash = randomString(35)
+                let randomHash = hash(randomStringHash)
+                let mediaRandomStringHash = randomString(35)
+                let mediaRandomHash = hash(mediaRandomStringHash)
+                let messageSender = sqlCheck[0]['checkUsername']
+                let messageUser = sqlCheck[0]['username']
+                let seconds = new Date().getTime() / 1000
+
+                await executeSQL('INSERT INTO Centri.messages (messageHash, messageContent, messageSender, messageType, chat, messageUser, sendingTime) VALUES ("' + randomHash + '", "' + mediaRandomHash + '", "' + messageSender + '", 2, "' + chatHash + '", "' + messageUser + '", ' + seconds + ')')
+                await executeSQL('INSERT INTO Centri.media (mediaHash, mediaSender, media) VALUES ("' + mediaRandomHash + '", "' + messageSender + '", "' + fileData + '")')
+                io.emit('callMessage', JSON.stringify({'chat': chatHash, 'messageHash': randomHash}))
+                return
             }
         } else {
             return

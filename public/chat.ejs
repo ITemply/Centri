@@ -19,6 +19,10 @@
     <input type="text" placeholder="message here" id="message" class="messageInput">
     <input type="button" value="Send Message" id="messageSendButton" class="messageSendButton" onclick="sendMessage()">
     <br><br>
+    <input type="button" value="Upload Image" onclick="document.getElementById('uploadfileid').click()" class="messageSendButton">
+    <span class="imageData" id="imageData"></span>
+    <input type="file" id="uploadfileid" accept="image/*" onchange="uploadMessage()" hidden>
+    <br><br>
     <span class="serverData" id="serverData"><%- serverData %></span>
 </body>
 
