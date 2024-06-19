@@ -10,4 +10,4 @@ Version: 1.1.0 | Media Version
 - <b>p0syd0n</b> (Testing, 5-10 Lines)
 - <b>ITemply</b> (Logos, Style, Main Programming)
 
-A secure chat app at it's finest. 
+A secure chat app at it's finest. This chat works perfectly, without error, every time. Use it at your own will, with your own databases. 
