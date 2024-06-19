@@ -127,7 +127,7 @@ async function uploadMessage() {
   
         const fileData = {'fileData': b64, 'chatHash': serverData['chatHash'], 'token': token}
     
-        socket.emit('newFile', fileData)
+        socket.emit('newFile', JSON.stringify(fileData))
         document.getElementById('imageData').innerHTML = 'File Uploaded'
       } else {
         document.getElementById('imageData').innerHTML = ''

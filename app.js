@@ -3,7 +3,7 @@ const path = require('node:path')
 const bodyParser = require('body-parser')
 const app = express()
 const server = require('http').createServer(app)
-const io = require('socket.io')(server, {maxHttpBufferSize: 3.05e6, pingTimeout: 60000})
+const io = require('socket.io')(server, {maxHttpBufferSize: 3.5e6, pingTimeout: 60000})
 const dotenv = require('dotenv')
 const mysql = require('mysql')
 const crypto = require('crypto')
@@ -17,6 +17,8 @@ dotenv.config()
 app.set('views', path.join(__dirname, 'public'))
 app.use('/images', express.static('images'));
 app.set('view engine', 'ejs')
+app.use(bodyParser.json({limit: '35mb'}));
+app.use(bodyParser.urlencoded({limit: '35mb', extended: true}));
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(express.static(path.join(__dirname, 'public')))
 app.use(cookieParser())
@@ -44,7 +46,7 @@ const sqlConnection = mysql.createPool({
 async function executeSQL(sql){
   return new Promise((resolve, reject) =>{
       try{
-        sqlConnection.query(sql, function(err, result) {
+        sqlConnection.query(sql, function (err, result) {
             if (err){
                 return reject(err)
             }
@@ -236,7 +238,7 @@ app.get('/chat/:chatHash', async function(req, res){
                             let messageData = message['messageContent']
                             let username = decode(message['messageUser'], key, iv)
     
-                            messageString += '<div class="message" id="' + messageHash + '"><span class="username" id="username">' + username + ':</span> <a href="" id="a-' + messageData + '" target="_blank" ><img class="sentMedia" src="" onerror="loadMedia(`' + messageData + '`)" id="' + messageData + '"></a> ' + canDelete + '</div>'
+                            messageString += '<div class="message" id="' + messageHash + '"><span class="username" id="username">' + username + ':</span> <div class="loader" id="loader-' + messageData + '"></div><a href="" id="a-' + messageData + '" target="_blank" ><img class="sentMedia" src="" onerror="loadMedia(`' + messageData + '`)" id="' + messageData + '"></a> ' + canDelete + '</div>'
                         }
                     }
                 }
@@ -573,7 +575,7 @@ app.post('/api/getmessage', async function(req, res){
                     let messageDat = messageData[0]['messageContent']
                     let username = decode(messageData[0]['messageUser'], key, iv)
 
-                    messageString += '<div class="message" id="' + messageHash + '"><span class="username" id="username">' + username + ':</span> <a href="" id="a-' + messageDat + '" target="_blank"><img class="sentMedia" src="" onerror="loadMedia(`' + messageDat + '`)" id="' + messageDat + '"></a> ' + canDelete + '</div>'
+                    messageString += '<div class="message" id="' + messageHash + '"><span class="username" id="username">' + username + ':</span> <div class="loader" id="loader-' + messageDat + '"></div><a href="" id="a-' + messageDat + '" target="_blank"><img class="sentMedia" src="" onerror="loadMedia(`' + messageDat + '`)" id="' + messageDat + '"></a> ' + canDelete + '</div>'
                 }
 
                 res.send(JSON.stringify({'information': messageString}))
